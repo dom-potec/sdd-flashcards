@@ -1,0 +1,61 @@
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  max-width: 720px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+  line-height: 1.5;
+  color: #222;
+}
+
+nav {
+  border-bottom: 1px solid #ccc;
+  padding-bottom: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+nav a {
+  font-weight: bold;
+  text-decoration: none;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+}
+
+th, td {
+  border: 1px solid #ccc;
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+}
+
+form {
+  margin: 1rem 0;
+}
+
+input, textarea {
+  width: 100%;
+  padding: 0.4rem;
+  margin: 0.2rem 0 0.6rem;
+  box-sizing: border-box;
+}
+
+button {
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+}
+
+.flash {
+  background: #fff3cd;
+  border: 1px solid #e0c36b;
+  padding: 0.5rem 1rem;
+}
+
+.card-front {
+  font-size: 1.6rem;
+  border: 2px solid #333;
+  padding: 2rem;
+  margin: 1rem 0;
+  text-align: center;
+}
