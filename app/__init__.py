@@ -1,6 +1,7 @@
-from flask import Flask, jsonify
+from flask import Flask, g, jsonify
 
 from . import config
+from .db import init_db
 
 
 def create_app(test_config: dict | None = None) -> Flask:
@@ -12,11 +13,18 @@ def create_app(test_config: dict | None = None) -> Flask:
     if test_config:
         app.config.update(test_config)
 
-    # TODO(block 4): init_db(app.config["DB_PATH"]) and teardown that closes g.conn
+    init_db(app.config["DB_PATH"])
+
     # TODO(block 10/11): register the content and study blueprints and the "/" redirect
 
     @app.get("/health")
     def health():
         return jsonify(status="ok")
+
+    @app.teardown_appcontext
+    def close_conn(exc):
+        conn = g.pop("conn", None)
+        if conn is not None:
+            conn.close()
 
     return app
