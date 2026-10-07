@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Decks{% endblock %}
+{% block content %}
+<h1>Decks</h1>
+
+{% if decks %}
+<table>
+  <tr>
+    <th>Name</th>
+    <th>Description</th>
+    <th>Cards</th>
+    <th></th>
+    <th></th>
+  </tr>
+  {% for deck in decks %}
+  <tr>
+    <td><a href="{{ url_for('content.show_deck', deck_id=deck.id) }}">{{ deck.name }}</a></td>
+    <td>{{ deck.description }}</td>
+    <td>{{ deck.card_count }}</td>
+    <td><a href="/study/{{ deck.id }}">Study</a></td>
+    <td>
+      <form method="post" action="{{ url_for('content.delete_deck', deck_id=deck.id) }}">
+        <button type="submit">Delete</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% else %}
+<p>No decks yet.</p>
+{% endif %}
+
+<h2>New deck</h2>
+<form method="post" action="{{ url_for('content.create_deck') }}">
+  <label>Name <input name="name" required></label>
+  <label>Description <input name="description"></label>
+  <button type="submit">Create deck</button>
+</form>
+{% endblock %}

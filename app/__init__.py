@@ -1,4 +1,4 @@
-from flask import Flask, g, jsonify
+from flask import Flask, g, jsonify, redirect, url_for
 
 from . import config
 from .db import init_db
@@ -15,11 +15,17 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     init_db(app.config["DB_PATH"])
 
-    # TODO(block 10/11): register the content and study blueprints and the "/" redirect
+    from .content.routes import bp as content_bp
+    app.register_blueprint(content_bp)
+    # TODO(block 11): register the study blueprint
 
     @app.get("/health")
     def health():
         return jsonify(status="ok")
+
+    @app.get("/")
+    def index():
+        return redirect(url_for("content.list_decks"))
 
     @app.teardown_appcontext
     def close_conn(exc):
