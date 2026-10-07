@@ -42,3 +42,17 @@ Decision: Im going to use two tables: one for the card schedule which has primar
 Alternatives considered: I could have had ease_factor and due_at in the cards table, but cards belongs to content, whos code would be holding schedulings data and I would have had to migrate the table in the future.
 
 Consequences: The study query happens in two steps. Cards with no schedule are due now, since it doesnt have a schedule row, so the moment you add a card, it is asked. Due_at has an index which makes the lookup for due cards faster.
+
+## 4. Testing: pure scheduler and repositories first, routes covered only by smoke tests
+
+Date: 2026-10-07
+
+Status: Decided
+
+Context: At least 70% coverage on core logic, the core logic in this app is the SM-2 math and the two repositories, not the routing which connects them to the web pages.
+
+Decision: I test sm2.py in detail, the interval growth, lapses, the ease floor, grades which are invalid and the due dates. Both repositories are tested against a temp SQLite database. The routes are simple enough that all I need are 4 tests: the app start, redirects, the creation of teh decks and studying an empty deck.
+
+Alternatives considered: Testing the routes with Flasks test client, I rejected it cause passing route tests doesnt show that the scheduler calculated the right interval.
+
+Consequences: Coverage is measured over all of app, routes are included, making the actual number slightly higher. Since the tests use a SQLite file, we also check that deleting cards removes the schedule and review row.
