@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Study: {{ deck.name }}{% endblock %}
+{% block content %}
+<h1>Study: {{ deck.name }}</h1>
+
+{% if done %}
+<p>All caught up — nothing due.</p>
+<p><a href="{{ url_for('content.show_deck', deck_id=deck.id) }}">Back to deck</a></p>
+{% else %}
+<p>{{ remaining }} due</p>
+<div class="card-front">{{ card.front }}</div>
+
+{% if not reveal %}
+<p><a href="{{ url_for('study.study', deck_id=deck.id, reveal=1) }}">Show answer</a></p>
+{% else %}
+<div class="card-back">{{ card.back }}</div>
+<p>How well did you know it?</p>
+<div class="grades">
+  {% for value, label in grades %}
+  <form method="post" action="{{ url_for('study.review', deck_id=deck.id) }}">
+    <input type="hidden" name="card_id" value="{{ card.id }}">
+    <input type="hidden" name="grade" value="{{ value }}">
+    <button type="submit">{{ value }} {{ label }}</button>
+  </form>
+  {% endfor %}
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

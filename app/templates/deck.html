@@ -4,7 +4,7 @@
 <h1>{{ deck.name }}</h1>
 {% if deck.description %}<p>{{ deck.description }}</p>{% endif %}
 
-<p><a href="/study/{{ deck.id }}"><button type="button">Study this deck</button></a></p>
+<p><a href="{{ url_for('study.study', deck_id=deck.id) }}"><button type="button">Study this deck</button></a></p>
 
 {% if cards %}
 <table>

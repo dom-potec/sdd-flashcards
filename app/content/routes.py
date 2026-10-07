@@ -1,6 +1,9 @@
+from datetime import date
+
 from flask import Blueprint, abort, current_app, flash, g, redirect, render_template, request, url_for
 
 from ..db import get_conn
+from ..scheduling import repository as scheduling
 from . import repository
 
 bp = Blueprint("content", __name__)
@@ -15,7 +18,12 @@ def conn():
 @bp.get("/decks")
 def list_decks():
     decks = repository.list_decks(conn())
-    return render_template("decks.html", decks=decks)
+    today = date.today()
+    due = {
+        deck["id"]: scheduling.count_due(conn(), repository.list_card_ids(conn(), deck["id"]), today)
+        for deck in decks
+    }
+    return render_template("decks.html", decks=decks, due=due)
 
 
 @bp.post("/decks")

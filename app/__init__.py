@@ -16,8 +16,9 @@ def create_app(test_config: dict | None = None) -> Flask:
     init_db(app.config["DB_PATH"])
 
     from .content.routes import bp as content_bp
+    from .scheduling.routes import bp as study_bp
     app.register_blueprint(content_bp)
-    # TODO(block 11): register the study blueprint
+    app.register_blueprint(study_bp)
 
     @app.get("/health")
     def health():

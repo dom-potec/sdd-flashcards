@@ -59,3 +59,16 @@ button {
   margin: 1rem 0;
   text-align: center;
 }
+
+.card-back {
+  font-size: 1.3rem;
+  border: 1px dashed #666;
+  padding: 1.5rem;
+  margin: 1rem 0;
+  text-align: center;
+}
+
+.grades form {
+  display: inline-block;
+  margin: 0.2rem 0.3rem 0.2rem 0;
+}

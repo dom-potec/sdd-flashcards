@@ -9,6 +9,7 @@
     <th>Name</th>
     <th>Description</th>
     <th>Cards</th>
+    <th>Due today</th>
     <th></th>
     <th></th>
   </tr>
@@ -17,7 +18,8 @@
     <td><a href="{{ url_for('content.show_deck', deck_id=deck.id) }}">{{ deck.name }}</a></td>
     <td>{{ deck.description }}</td>
     <td>{{ deck.card_count }}</td>
-    <td><a href="/study/{{ deck.id }}">Study</a></td>
+    <td>{{ due[deck.id] }}</td>
+    <td><a href="{{ url_for('study.study', deck_id=deck.id) }}">Study</a></td>
     <td>
       <form method="post" action="{{ url_for('content.delete_deck', deck_id=deck.id) }}">
         <button type="submit">Delete</button>
