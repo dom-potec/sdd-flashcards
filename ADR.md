@@ -51,8 +51,22 @@ Status: Decided
 
 Context: At least 70% coverage on core logic, the core logic in this app is the SM-2 math and the two repositories, not the routing which connects them to the web pages.
 
-Decision: I test sm2.py in detail, the interval growth, lapses, the ease floor, grades which are invalid and the due dates. Both repositories are tested against a temp SQLite database. The routes are simple enough that all I need are 4 tests: the app start, redirects, the creation of teh decks and studying an empty deck.
+Decision: I test sm2.py in detail, the interval growth, lapses, the ease floor, grades which are invalid and the due dates. Both repositories are tested against a temp SQLite database. The routes are simple enough that all I need are 4 tests: the app start, redirects, the creation of the decks and studying an empty deck.
 
 Alternatives considered: Testing the routes with Flasks test client, I rejected it cause passing route tests doesnt show that the scheduler calculated the right interval.
 
 Consequences: Coverage is measured over all of app, routes are included, making the actual number slightly higher. Since the tests use a SQLite file, we also check that deleting cards removes the schedule and review row.
+
+## 5. Not built: user accounts
+
+Date: 2026-10-08
+
+Status: Decided
+
+Context: User accounts with a login page are the next feature I should add, and its left up to me whether to build them.
+
+Decision: The app has one user and no login, whoever runs it has access to all the decks.
+
+Alternatives considered: Flask-login with a users table. I didnt do it because it adds another dependency and another table, which I would have had to integrate with both domains, and content and scheduling dont need to know who owns the decks.
+
+Consequences: The app cant be shared by more than one person, adding login later means just adding a owner_id column to decks, and scheduling would remain unchanged.
