@@ -1,0 +1,36 @@
+erDiagram
+    decks {
+        INTEGER id PK "AUTOINCREMENT"
+        TEXT name "NOT NULL"
+        TEXT description "NOT NULL DEFAULT ''"
+        TEXT created_at "NOT NULL DEFAULT datetime('now')"
+    }
+
+    cards {
+        INTEGER id PK "AUTOINCREMENT"
+        INTEGER deck_id FK "NOT NULL, ON DELETE CASCADE"
+        TEXT front "NOT NULL"
+        TEXT back "NOT NULL"
+        TEXT created_at "NOT NULL DEFAULT datetime('now')"
+    }
+
+    card_schedule {
+        INTEGER card_id PK, FK "ON DELETE CASCADE"
+        REAL ease_factor "NOT NULL DEFAULT 2.5"
+        INTEGER repetitions "NOT NULL DEFAULT 0"
+        INTEGER interval_days "NOT NULL DEFAULT 0"
+        TEXT due_at "NOT NULL, ISO date YYYY-MM-DD"
+    }
+
+    reviews {
+        INTEGER id PK "AUTOINCREMENT"
+        INTEGER card_id FK "NOT NULL, ON DELETE CASCADE"
+        TEXT reviewed_at "NOT NULL DEFAULT datetime('now')"
+        INTEGER grade "NOT NULL, CHECK 0-5"
+        INTEGER interval_before "NOT NULL"
+        INTEGER interval_after "NOT NULL"
+    }
+
+    decks ||--o{ cards : "deck_id → decks.id"
+    cards ||--o| card_schedule : "card_id → cards.id (one current state)"
+    cards ||--o{ reviews : "card_id → cards.id (append-only log)"

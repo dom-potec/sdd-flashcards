@@ -1,0 +1,43 @@
+%%{init: {"flowchart": {"rankSpacing": 40, "nodeSpacing": 40}}}%%
+flowchart TB
+    browser["Browser"]
+
+    subgraph container["One container · python app.py · PORT and DATA_DIR from env"]
+        direction TB
+        flask["Flask app — app.py → create_app()<br/>/health · / → /decks"]
+
+            c_routes["content/routes.py<br/>/decks · /decks/&lt;id&gt; · card forms"]
+            s_routes["scheduling/routes.py<br/>/study/&lt;deck_id&gt; · POST review"]
+
+        subgraph content["app/content/ — Content domain"]
+            direction TB
+            c_repo["repository.py<br/>create_deck · list_decks · get_deck<br/>create_card · list_cards · list_card_ids<br/>get_card · update_card · delete_*"]
+        end
+
+        subgraph scheduling["app/scheduling/ — Scheduling domain"]
+            direction TB
+            s_repo["repository.py<br/>get_state · record_review<br/>due_card_ids · count_due"]
+            sm2["sm2.py (pure, stdlib only)<br/>ScheduleState · next_state · due_date"]
+            s_repo --> sm2
+        end
+
+        db[("SQLite — $DATA_DIR/flashcards.db (/data in the container)<br/>decks, cards │ card_schedule, reviews")]
+
+        flask --> c_routes
+        flask --> s_routes
+        c_routes --> c_repo
+        s_routes --> s_repo
+        c_routes -. "card ids → count_due" .-> s_repo
+        s_routes -. "list_card_ids, get_card" .-> c_repo
+        c_repo --> db
+        s_repo --> db
+    end
+
+    browser --> flask
+
+    classDef contentStyle fill:#dbeafe,stroke:#1d4ed8,color:#111
+    classDef schedStyle fill:#dcfce7,stroke:#15803d,color:#111
+    classDef seam fill:#fff,stroke:#b91c1c,stroke-width:2px,stroke-dasharray:6 4
+    class c_routes,c_repo contentStyle
+    class s_routes,s_repo,sm2 schedStyle
+    class content,scheduling seam
