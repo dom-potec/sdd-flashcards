@@ -1,0 +1,56 @@
+# Local stack: SQL Server, a one-off database init, the two services and the static UI.
+# Every password in this file is a local-only development credential. None is ever used on Azure.
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64                      # no arm64 image; on Apple Silicon turn on Rosetta in Docker Desktop
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: "LocalDev_Passw0rd"   # local-only credential
+    ports: ["1433:1433"]
+    volumes: [sqldata:/var/opt/mssql]
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P LocalDev_Passw0rd -Q 'SELECT 1' -b"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  db-init:                                     # one-off: creates the databases and logins, then exits
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64
+    depends_on:
+      sqlserver: { condition: service_healthy }
+    volumes: ["./db/init.sql:/init.sql:ro"]
+    command: /opt/mssql-tools18/bin/sqlcmd -C -S sqlserver -U sa -P LocalDev_Passw0rd -i /init.sql -b
+
+  content:
+    build: ./services/content
+    environment:
+      DATABASE_URL: "mssql://content_user:ContentDev_Passw0rd@sqlserver:1433/content"   # local-only credential
+      UI_ORIGIN: "http://localhost:8080"
+      GIT_SHA: "local"
+    ports: ["8000:8000"]
+    depends_on:
+      db-init: { condition: service_completed_successfully }
+
+  scheduling:
+    build: ./services/scheduling
+    environment:
+      DATABASE_URL: "mssql://scheduling_user:SchedulingDev_Passw0rd@sqlserver:1433/scheduling"   # local-only credential
+      CONTENT_URL: "http://content:8000"
+      CONTENT_TIMEOUT_S: "2"
+      UI_ORIGIN: "http://localhost:8080"
+      GIT_SHA: "local"
+    ports: ["8001:8000"]
+    depends_on:
+      db-init: { condition: service_completed_successfully }
+
+  ui:
+    image: nginx:alpine                        # stock image with the folder mounted: not a service container
+    volumes: ["./ui:/usr/share/nginx/html:ro"]
+    ports: ["8080:80"]
+
+volumes:
+  sqldata:
