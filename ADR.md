@@ -70,3 +70,20 @@ Decision: The app has one user and no login, whoever runs it has access to all t
 Alternatives considered: Flask-login with a users table. I didnt do it because it adds another dependency and another table, which I would have had to integrate with both domains, and content and scheduling dont need to know who owns the decks.
 
 Consequences: The app cant be shared by more than one person, adding login later means just adding a owner_id column to decks, and scheduling would remain unchanged.
+
+## 6. The split: content and scheduling as two services along the ADR-2 seam
+
+Date: 2026-11-11
+
+Status: Decided
+
+Context: Assignment 2 requires one service per feature domain, each with its own container and database. I had already separated `app/content` from `app/scheduling` inside the monolith and allowed a single call across that boundary,which is the study route reading cards from the content repository.
+
+Decision:I split the monolith along the boundary from ADR2. `services/content` owns decks and cards and `services/scheduling` owns SM-2 state and reviews. The single call becomes a single HTTP request in which scheduling calls `GET /decks/{id}/cards` on content, with a 2 s timeout. Scheduling works out which cards are due and the due-count badge on the server, so the UI asks each service only for that service's own data. The common boilerplate  is copied into each service folder instead of shared, because each Dockerfile builds from its own folder.
+
+Alternatives considered: 
+- Combining the study flow in the browser. Rejected: the UI would need both the full card list and the schedule state to decide what is due. That would mean reimplementing `due_card_ids` in JavaScript, and I could no longer enforce the rule that scheduling knows only card ids.
+- Moving `card_schedule` into content so that no service-to-service call is needed. Rejected: content would then own scheduling data, which is what ADR-3 set out to avoid.
+
+
+Consequences: Every study step costs one HTTP round trip between the services, and the study path returns 503 when content is down. The boundary in ADR2 holds since no table had to move. The services share no code at runtime.
