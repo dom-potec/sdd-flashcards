@@ -3,7 +3,7 @@ from datetime import date
 
 import pytest
 
-from app.scheduling.sm2 import MIN_EASE, ScheduleState, due_date, next_state
+from app.sm2 import MIN_EASE, ScheduleState, due_date, next_state
 
 
 def test_first_review_grade5():
