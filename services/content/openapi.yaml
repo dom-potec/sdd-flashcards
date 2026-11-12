@@ -1,0 +1,217 @@
+openapi: 3.0.3
+info:
+  title: Flashcards content service
+  version: 1.0.0
+  description: >
+    Decks and cards, the study material. The scheduling service depends on one operation here,
+    GET /decks/{deck_id}/cards, to learn which cards a deck has and what they say.
+servers:
+  - url: http://localhost:8000
+    description: Local docker compose stack
+
+paths:
+  /health:
+    get:
+      summary: Is the service able to read and write its own database
+      operationId: health
+      responses:
+        "200":
+          description: The database answered a write and a read
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+        "503":
+          description: The database could not be reached or written
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+
+  /decks:
+    get:
+      summary: List all decks with their card counts
+      operationId: listDecks
+      responses:
+        "200":
+          description: Every deck, ordered by id
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Deck" }
+    post:
+      summary: Create a deck
+      operationId: createDeck
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/DeckInput" }
+      responses:
+        "201":
+          description: The new deck
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Deck" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /decks/{deck_id}:
+    parameters:
+      - $ref: "#/components/parameters/DeckId"
+    get:
+      summary: Get one deck
+      operationId: getDeck
+      responses:
+        "200":
+          description: The deck
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Deck" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      summary: Delete a deck and all of its cards
+      operationId: deleteDeck
+      responses:
+        "204":
+          description: Deleted, no body
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /decks/{deck_id}/cards:
+    parameters:
+      - $ref: "#/components/parameters/DeckId"
+    get:
+      summary: List the cards of a deck
+      description: >
+        The cross-service contract. The scheduling service calls this to get the ids of a deck's cards
+        and the text it passes on to the study page. Cards are ordered by id.
+      operationId: listCards
+      responses:
+        "200":
+          description: The deck's cards, ordered by id (empty list for a deck with no cards)
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Card" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      summary: Add a card to a deck
+      operationId: createCard
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CardInput" }
+      responses:
+        "201":
+          description: The new card
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Card" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /cards/{card_id}:
+    parameters:
+      - $ref: "#/components/parameters/CardId"
+    get:
+      summary: Get one card
+      operationId: getCard
+      responses:
+        "200":
+          description: The card
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Card" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      summary: Replace the front and back of a card
+      operationId: updateCard
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CardInput" }
+      responses:
+        "200":
+          description: The updated card
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Card" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      summary: Delete a card
+      operationId: deleteCard
+      responses:
+        "204":
+          description: Deleted, no body
+        "404": { $ref: "#/components/responses/NotFound" }
+
+components:
+  parameters:
+    DeckId:
+      name: deck_id
+      in: path
+      required: true
+      schema: { type: integer, minimum: 0 }
+    CardId:
+      name: card_id
+      in: path
+      required: true
+      schema: { type: integer, minimum: 0 }
+
+  responses:
+    BadRequest:
+      description: The body is missing, is not JSON, or a required text field is blank
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: No deck or card with that id
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    Deck:
+      type: object
+      required: [id, name, description, card_count, created_at]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        description: { type: string }
+        card_count: { type: integer, description: Number of cards in the deck }
+        created_at: { type: string, format: date-time, example: "2026-11-12T14:24:03Z" }
+    DeckInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, description: Must not be blank; surrounding spaces are removed }
+        description: { type: string, default: "" }
+    Card:
+      type: object
+      required: [id, deck_id, front, back, created_at]
+      properties:
+        id: { type: integer }
+        deck_id: { type: integer }
+        front: { type: string }
+        back: { type: string }
+        created_at: { type: string, format: date-time, example: "2026-11-12T14:24:03Z" }
+    CardInput:
+      type: object
+      required: [front, back]
+      properties:
+        front: { type: string, description: Must not be blank }
+        back: { type: string, description: Must not be blank }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, example: not found }
+    Health:
+      type: object
+      required: [status, db, version]
+      properties:
+        status: { type: string, enum: [ok, error] }
+        db: { type: string, enum: [ok, error] }
+        version: { type: string, description: Git commit the running image was built from }
