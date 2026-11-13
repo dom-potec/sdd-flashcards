@@ -1,0 +1,173 @@
+openapi: 3.0.3
+info:
+  title: Flashcards scheduling service
+  version: 1.0.0
+  description: >
+    SM-2 scheduling state, the review log and what is due. It stores only card ids. The two /study
+    operations call the content service (GET /decks/{deck_id}/cards) with a timeout and answer 503
+    when it does not respond; reviews and schedules use only this service's own database.
+servers:
+  - url: http://localhost:8001
+    description: Local docker compose stack
+
+paths:
+  /health:
+    get:
+      summary: Is the service able to read and write its own database
+      description: Never calls the content service.
+      operationId: health
+      responses:
+        "200":
+          description: The database answered a write and a read
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+        "503":
+          description: The database could not be reached or written
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+
+  /study/{deck_id}/next:
+    parameters:
+      - $ref: "#/components/parameters/DeckId"
+    get:
+      summary: The next card to study in a deck, with its text
+      description: >
+        Fetches the deck's cards from the content service, keeps the ones that are new or due today,
+        and returns the first: new cards first by id, then the longest overdue.
+      operationId: nextCard
+      responses:
+        "200":
+          description: The next card, or done when nothing is due
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NextCard" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ContentUnavailable" }
+
+  /study/{deck_id}/due-count:
+    parameters:
+      - $ref: "#/components/parameters/DeckId"
+    get:
+      summary: How many cards of a deck are new or due today
+      operationId: dueCount
+      responses:
+        "200":
+          description: The count
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DueCount" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/ContentUnavailable" }
+
+  /reviews:
+    post:
+      summary: Record a grade for a card and reschedule it
+      description: >
+        Does not ask the content service whether the card exists, so it keeps working while
+        content is down.
+      operationId: createReview
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReviewRequest" }
+      responses:
+        "201":
+          description: The card's schedule after the review
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ScheduleState" }
+        "400":
+          description: card_id or grade is missing or not an integer, or grade is outside 0-5
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /cards/{card_id}/schedule:
+    parameters:
+      - name: card_id
+        in: path
+        required: true
+        schema: { type: integer, minimum: 0 }
+    get:
+      summary: The current schedule of a card
+      description: A card that was never reviewed has the default state and due_at null.
+      operationId: getSchedule
+      responses:
+        "200":
+          description: The schedule
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ScheduleState" }
+
+components:
+  parameters:
+    DeckId:
+      name: deck_id
+      in: path
+      required: true
+      schema: { type: integer, minimum: 0 }
+
+  responses:
+    NotFound:
+      description: The content service says there is no deck with that id
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    ContentUnavailable:
+      description: The content service did not answer within the timeout or answered with an error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: content service unavailable }
+
+  schemas:
+    NextCard:
+      type: object
+      required: [done, remaining]
+      properties:
+        done: { type: boolean, description: True when no card of the deck is due }
+        remaining: { type: integer, description: "Number of due cards, including the one returned" }
+        card:
+          description: Present only when done is false
+          type: object
+          required: [id, front, back]
+          properties:
+            id: { type: integer }
+            front: { type: string }
+            back: { type: string }
+    DueCount:
+      type: object
+      required: [deck_id, due]
+      properties:
+        deck_id: { type: integer }
+        due: { type: integer }
+    ReviewRequest:
+      type: object
+      required: [card_id, grade]
+      properties:
+        card_id: { type: integer }
+        grade: { type: integer, minimum: 0, maximum: 5, description: "0 blackout to 5 easy; below 3 is a lapse" }
+    ScheduleState:
+      type: object
+      required: [card_id, ease_factor, repetitions, interval_days, due_at]
+      properties:
+        card_id: { type: integer }
+        ease_factor: { type: number, example: 2.5 }
+        repetitions: { type: integer }
+        interval_days: { type: integer }
+        due_at: { type: string, format: date, nullable: true, example: "2026-11-14" }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, example: not found }
+    Health:
+      type: object
+      required: [status, db, version]
+      properties:
+        status: { type: string, enum: [ok, error] }
+        db: { type: string, enum: [ok, error] }
+        version: { type: string, description: Git commit the running image was built from }
