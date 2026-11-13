@@ -86,3 +86,19 @@ Alternatives considered:
 - Moving `card_schedule` into content so that no service-to-service call is needed. Rejected: content would then own scheduling data, which is what ADR-3 set out to avoid.
 
 Consequences: Every study step costs one HTTP round trip between the services, and the study path returns 503 when content is down. The boundary in ADR-2 holds since no table had to move. The services share no code at runtime, so `db.py`, `migrate.py` and `logging_.py` exist twice on purpose and a fix in one has to be made in the other.
+
+## 7. Data per service: tables follow their package, the card foreign key is dropped, migrations are numbered SQL
+
+Date: 2026-11-13
+
+Status: Decided
+
+Context: The single SQLite file becomes two SQL Server databases, each with its own login. card_schedule and reviews used to reference cards.id with a foreign key, and a foreign key cannot cross databases. The schema also has to change later without losing data.
+
+Decision: `decks` and `cards` go to the content database. `card_schedule` and `reviews` go to the scheduling database, where `card_id` is a plain INT with no foreign key. Deleting a card leaves orphan rows in scheduling, which I accept since `due_card_ids` only looks at the ids content returns, so orphans are never shown, and `POST /reviews` does not check that the card exists, so reviews keep working when content is down. Each service has numbered SQL files that `migrate.py` applies in order at startup and records in `schema_migrations`.
+
+Alternatives considered:
+- Alembic or a similar tool. Rejected: too much for two tables per service, and my runner is small enough to explain line by line.
+- Asking content to validate the card before every review. Rejected: reviews would fail whenever content is down.
+
+Consequences: Orphan rows are limited to the number of deleted cards and cost nothing. Migrations only go forward, so a bad one is fixed with a new file, never by editing an applied one. A failing migration rolls back and the service does not start, so once deployed the health check will fail and the previous revision will stay active. If a migration damages data, Azure SQL will keep 7 days of point-in-time restore.
