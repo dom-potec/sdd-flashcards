@@ -12,6 +12,6 @@ def from_env() -> dict:
         "GIT_SHA": os.environ.get("GIT_SHA", "dev"),
         "DB_CONNECT_ATTEMPTS": int(os.environ.get("DB_CONNECT_ATTEMPTS", "8")),  # ~2 min of backoff
         "MIGRATIONS_DIR": os.environ.get("MIGRATIONS_DIR", os.path.join(here, "..", "migrations")),
-        "CONTENT_URL": os.environ.get("CONTENT_URL", "http://content:8000"),  # base URL of the content service
-        "CONTENT_TIMEOUT_S": float(os.environ.get("CONTENT_TIMEOUT_S", "2")),  # every call to content times out
+        "CONTENT_URL": os.environ.get("CONTENT_URL", "http://content:8000"),  # the content service
+        "CONTENT_TIMEOUT_S": float(os.environ.get("CONTENT_TIMEOUT_S", "2")),  # seconds per call
     }
