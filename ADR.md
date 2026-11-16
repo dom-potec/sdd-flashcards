@@ -102,3 +102,21 @@ Alternatives considered:
 - Asking content to validate the card before every review. Rejected: reviews would fail whenever content is down.
 
 Consequences: Orphan rows are limited to the number of deleted cards and cost nothing. Migrations only go forward, so a bad one is fixed with a new file, never by editing an applied one. A failing migration rolls back and the service does not start, so once deployed the health check will fail and the previous revision will stay active. If a migration damages data, Azure SQL will keep 7 days of point-in-time restore.
+
+## 9. Pipeline gates and the cross-seam test
+
+Date: 2026-11-16
+
+Status: Decided
+
+Context: CI happens on every push and deployment from main only. CI must check coverage, validate the documents, build the images and run at least one integration test across the two services.
+
+Decision: I use one workflow. The CI jobs lint and unit test each service with at least 70% coverage, validate `system.yaml` and both OpenAPI files, and build both images. CI then starts the compose stack and runs the integration test, which studies a deck across both services and stops content to check for a fast 503. The deploy job needs all of these to pass and runs only on a push to main. The call between services is tested twice: the unit tests replace content with a stub, and the integration test uses real HTTP.
+
+Alternatives considered:
+- Only stubbed tests. Rejected: they cannot catch a mismatch between what content returns and what scheduling expects.
+- Only compose tests. Rejected: they are slow, and failures are hard to trigger.
+- Separate CI and CD workflows. Rejected: one file with `needs` is easier to read and guarantees the deploy runs only if CI passed on the same commit.
+
+Consequences: CI takes a few minutes because of the SQL Server image. I do not test the UI JavaScript, the Azure deployment beyond the health check after deploy, or load.
+

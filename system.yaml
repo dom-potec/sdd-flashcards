@@ -1,0 +1,59 @@
+# yaml-language-server: $schema=./system.schema.json
+student: dpotec.ieu2024
+prefix: dpotec-ieu2024
+# public_url: TODO, the Static Web App hostname, known after the first Azure deployment
+ui:
+  path: ui
+  static_web_app: dpotec-ieu2024-ui
+  calls: [content, scheduling]
+azure:
+  resource_group: rg-sdd-3b
+  container_apps_environment: dpotec-ieu2024-env
+  sql_server: dpotec-ieu2024-sql
+  registry: ghcr.io/dom-potec
+services:
+  content:
+    description: Decks and cards, the study material.
+    path: services/content
+    openapi: services/content/openapi.yaml
+    port_default: 8000
+    health: /health
+    migrations: services/content/migrations
+    env:
+      PORT: { default: 8000, description: Port the service listens on }
+      DATABASE_URL: { secret: true, description: "mssql:// connection string of the content database" }
+      UI_ORIGIN: { default: "http://localhost:8080", description: The only origin allowed by CORS }
+      GIT_SHA: { default: dev, description: Commit the image was built from; reported by /health }
+      DB_CONNECT_ATTEMPTS: { default: 8, description: Connection attempts with backoff while Azure SQL resumes }
+      MIGRATIONS_DIR: { default: migrations, description: Folder of numbered SQL migrations applied at startup }
+    calls: []
+    azure:
+      container_app: dpotec-ieu2024-content
+      sql_database: dpotec-ieu2024-content-db
+  scheduling:
+    description: SM-2 scheduling state, the review log and what is due.
+    path: services/scheduling
+    openapi: services/scheduling/openapi.yaml
+    port_default: 8000
+    health: /health
+    migrations: services/scheduling/migrations
+    env:
+      PORT: { default: 8000, description: Port the service listens on }
+      DATABASE_URL: { secret: true, description: "mssql:// connection string of the scheduling database" }
+      UI_ORIGIN: { default: "http://localhost:8080", description: The only origin allowed by CORS }
+      GIT_SHA: { default: dev, description: Commit the image was built from; reported by /health }
+      DB_CONNECT_ATTEMPTS: { default: 8, description: Connection attempts with backoff while Azure SQL resumes }
+      MIGRATIONS_DIR: { default: migrations, description: Folder of numbered SQL migrations applied at startup }
+      CONTENT_URL: { default: "http://content:8000", description: Base URL of the content service }
+      CONTENT_TIMEOUT_S: { default: 2, description: Timeout in seconds for calls to content }
+    calls:
+      - service: content
+        url_env: CONTENT_URL
+        endpoints: ["GET /decks/{deck_id}/cards"]
+        timeout_s: 2
+        on_failure: >-
+          GET /study/{deck_id}/next and GET /study/{deck_id}/due-count answer 503
+          {"error": "content service unavailable"}; POST /reviews and GET /cards/{card_id}/schedule keep working.
+    azure:
+      container_app: dpotec-ieu2024-scheduling
+      sql_database: dpotec-ieu2024-scheduling-db
