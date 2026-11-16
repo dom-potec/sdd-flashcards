@@ -72,3 +72,14 @@ button {
   display: inline-block;
   margin: 0.2rem 0.3rem 0.2rem 0;
 }
+
+/* A message from the page itself: a service is down, or a request was refused. */
+.notice {
+  background: #fff3cd;
+  border: 1px solid #e0c36b;
+  padding: 0.5rem 1rem;
+}
+
+.grades button {
+  margin: 0.2rem 0.3rem 0.2rem 0;
+}

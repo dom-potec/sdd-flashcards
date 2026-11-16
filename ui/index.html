@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Decks</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-page="index">
+  <nav>
+    <a href="index.html">Decks</a>
+  </nav>
+
+  <p id="notice" class="notice" hidden></p>
+
+  <main>
+    <h1>Decks</h1>
+
+    <p id="empty" hidden>No decks yet.</p>
+    <table id="decks" hidden>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+          <th>Cards</th>
+          <th>Due today</th>
+          <th></th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <h2>New deck</h2>
+    <form id="new-deck">
+      <label>Name <input name="name" required></label>
+      <label>Description <input name="description"></label>
+      <button type="submit">Create deck</button>
+    </form>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

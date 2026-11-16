@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Study</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-page="study">
+  <nav>
+    <a href="index.html">Decks</a>
+  </nav>
+
+  <p id="notice" class="notice" hidden></p>
+
+  <main>
+    <h1 id="deck-name">Study</h1>
+
+    <div id="done" hidden>
+      <p>All caught up — nothing due.</p>
+    </div>
+
+    <div id="card" hidden>
+      <p><span id="remaining"></span> due</p>
+      <div id="front" class="card-front"></div>
+      <p><button id="show-answer" type="button">Show answer</button></p>
+      <div id="answer" hidden>
+        <div id="back" class="card-back"></div>
+        <p>How well did you know it?</p>
+        <div id="grades" class="grades"></div>
+      </div>
+    </div>
+
+    <p><a id="deck-link" href="index.html">Back to deck</a></p>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

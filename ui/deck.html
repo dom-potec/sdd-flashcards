@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Deck</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-page="deck">
+  <nav>
+    <a href="index.html">Decks</a>
+  </nav>
+
+  <p id="notice" class="notice" hidden></p>
+
+  <main>
+    <h1 id="deck-name">Deck</h1>
+    <p id="deck-description"></p>
+
+    <p><a id="study-link" href="index.html"><button type="button">Study this deck</button></a></p>
+
+    <p id="empty" hidden>No cards yet.</p>
+    <table id="cards" hidden>
+      <thead>
+        <tr>
+          <th>Front</th>
+          <th>Back</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <h2>Add card</h2>
+    <form id="new-card">
+      <label>Front <input name="front" required></label>
+      <label>Back <input name="back" required></label>
+      <button type="submit">Add card</button>
+    </form>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
