@@ -8,6 +8,71 @@ on:
     branches: [main]
 
 jobs:
+  # Lints and tests each service against a real SQL Server, and fails below 70% coverage.
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false   # if one service fails, still show the result of the other
+      matrix:
+        service: [content, scheduling]
+    # A throwaway SQL Server that lives only for this job. CI never touches Azure SQL.
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: ${{ secrets.CI_SA_PASSWORD }}
+        ports:
+          - 1433:1433
+        # The job's steps start only once this command succeeds inside the container.
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P $MSSQL_SA_PASSWORD -Q 'SELECT 1' -b"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+          --health-start-period 20s
+    defaults:
+      run:
+        working-directory: services/${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Lint
+        run: flake8 app tests
+
+      - name: Test with coverage gate
+        env:
+          TEST_DATABASE_URL: mssql://sa:${{ secrets.CI_SA_PASSWORD }}@localhost:1433/${{ matrix.service }}_test
+        run: pytest --cov=app --cov-report=term-missing --cov-fail-under=70
+
+  # Checks the machine-readable descriptions of the system: both OpenAPI files and system.yaml.
+  validate-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install validators
+        run: pip install -r requirements-dev.txt
+
+      - name: Validate OpenAPI documents
+        run: openapi-spec-validator services/content/openapi.yaml services/scheduling/openapi.yaml
+
+      # system.schema.json is provided by the professor. Until it is in the repo this step is skipped.
+      - name: Validate system.yaml against system.schema.json
+        if: hashFiles('system.schema.json') != ''
+        run: check-jsonschema --schemafile system.schema.json system.yaml
+
   # Builds the image of every service. A Dockerfile that does not build fails the pipeline.
   # Only a push to main publishes the image to GHCR, tagged with the commit SHA.
   images:
