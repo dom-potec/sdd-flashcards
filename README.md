@@ -140,6 +140,19 @@ The browser talks to one Flask process. The two domains are sibling packages tha
 
 Four tables in one SQLite file. `decks` and `cards` belong to Content; `card_schedule` (one current-state row per card, created on its first review) and `reviews` (append-only log of every grade) belong to Scheduling. The only link between the domains is the foreign key from the two scheduling tables to `cards.id`, with `ON DELETE CASCADE` so deleting a card or deck removes its schedule and history. See ADR-3.
 
+## Pipeline
+
+One GitHub Actions workflow, [`.github/workflows/pipeline.yml`](.github/workflows/pipeline.yml), runs on every push to any branch and on every pull request to `main`. A job that fails makes the run red, and a red pull request is not merged.
+
+| Job | Runs | Fails when |
+|---|---|---|
+| `test` | once per service, against a throwaway SQL Server container | flake8 reports a problem, a test fails, or coverage of `app/` is below 70% |
+| `validate-docs` | once | an `openapi.yaml` is not valid OpenAPI, or `system.yaml` does not match `system.schema.json` |
+| `images` | once per service | the Dockerfile does not build; on `main` it also pushes the image to GHCR tagged with the commit SHA |
+| `integration` | once | the compose stack does not become healthy, or a test in `tests/integration` fails, including the one that stops the content service |
+
+CI never touches Azure SQL: the `test` job and the compose stack each use their own local SQL Server. Evidence of a failed run that was fixed is in [`docs/evidence/pipeline.md`](docs/evidence/pipeline.md).
+
 ## Process
 
 - [`ADR.md`](ADR.md): the five architecture decision records (framework, domain split, schema, testing, what was left out).
