@@ -100,3 +100,34 @@ jobs:
           context: services/${{ matrix.service }}
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: ghcr.io/dom-potec/sdd-flashcards-${{ matrix.service }}:${{ github.sha }}
+
+  # Starts the whole system with docker compose on the runner and tests it across the two services,
+  # over real HTTP, including what happens when the content container is stopped.
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # --wait returns once every container is healthy, and fails the job if one never becomes healthy.
+      - name: Start the stack
+        run: docker compose up --build --wait
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test tools
+        run: pip install -r requirements-dev.txt
+
+      - name: Run the integration tests
+        env:
+          RUN_FAILURE_TEST: "1"   # also run the test that stops the content container
+        run: pytest -v
+
+      - name: Show container logs if something failed
+        if: failure()
+        run: docker compose logs
+
+      - name: Stop the stack
+        if: always()
+        run: docker compose down -v
