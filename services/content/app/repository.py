@@ -8,6 +8,7 @@ DECK_COLUMNS = "d.id, d.name, d.description, d.created_at"
 
 
 def create_deck(conn: pymssql.Connection, name: str, description: str = "") -> int:
+    name = name.strip()
     if not name:
         raise ValueError("deck name must not be blank")
     cur = conn.cursor()
