@@ -2,5 +2,5 @@
 # Each service has its own requirements.txt and requirements-dev.txt in services/<name>/.
 pytest==9.2.0
 requests==2.34.2
-check-jsonschema==0.39.0
+pyyaml==6.0.3
 openapi-spec-validator==0.9.0

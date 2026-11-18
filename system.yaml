@@ -1,4 +1,5 @@
-# yaml-language-server: $schema=./system.schema.json
+# The system in one file: services, their configuration, the call across the seam and the Azure resources.
+# Format: the example in the assignment brief. Checked in CI by the validate-docs job.
 student: dpotec.ieu2024
 prefix: dpotec-ieu2024
 # public_url: TODO, the Static Web App hostname, known after the first Azure deployment

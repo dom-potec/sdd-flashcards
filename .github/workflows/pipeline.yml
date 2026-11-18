@@ -68,10 +68,19 @@ jobs:
       - name: Validate OpenAPI documents
         run: openapi-spec-validator services/content/openapi.yaml services/scheduling/openapi.yaml
 
-      # system.schema.json is provided by the professor. Until it is in the repo this step is skipped.
-      - name: Validate system.yaml against system.schema.json
-        if: hashFiles('system.schema.json') != ''
-        run: check-jsonschema --schemafile system.schema.json system.yaml
+      # The professor withdrew system.schema.json, so there is no schema to validate against.
+      # This still fails if system.yaml is not valid YAML, lost a service, or points at a missing file.
+      - name: Check system.yaml
+        run: |
+          python - <<'PY'
+          import os, yaml
+          system = yaml.safe_load(open("system.yaml"))
+          assert set(system["services"]) == {"content", "scheduling"}, list(system["services"])
+          for name, service in system["services"].items():
+              for key in ("path", "openapi", "migrations"):
+                  assert os.path.exists(service[key]), f"{name}.{key}: {service[key]} does not exist"
+          print("system.yaml is valid YAML and its paths exist")
+          PY
 
   # Builds the image of every service. A Dockerfile that does not build fails the pipeline.
   # Only a push to main publishes the image to GHCR, tagged with the commit SHA.

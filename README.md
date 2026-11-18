@@ -147,7 +147,7 @@ One GitHub Actions workflow, [`.github/workflows/pipeline.yml`](.github/workflow
 | Job | Runs | Fails when |
 |---|---|---|
 | `test` | once per service, against a throwaway SQL Server container | flake8 reports a problem, a test fails, or coverage of `app/` is below 70% |
-| `validate-docs` | once | an `openapi.yaml` is not valid OpenAPI, or `system.yaml` does not match `system.schema.json` |
+| `validate-docs` | once | an `openapi.yaml` is not valid OpenAPI, or `system.yaml` is not valid YAML or names a path that does not exist |
 | `images` | once per service | the Dockerfile does not build; on `main` it also pushes the image to GHCR tagged with the commit SHA |
 | `integration` | once | the compose stack does not become healthy, or a test in `tests/integration` fails, including the one that stops the content service |
 
