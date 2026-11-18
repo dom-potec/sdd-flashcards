@@ -153,6 +153,44 @@ One GitHub Actions workflow, [`.github/workflows/pipeline.yml`](.github/workflow
 
 CI never touches Azure SQL: the `test` job and the compose stack each use their own local SQL Server. Evidence of a failed run that was fixed is in [`docs/evidence/pipeline.md`](docs/evidence/pipeline.md).
 
+## Azure initial setup
+
+Everything on Azure is created once by [`infra/azure-setup.sh`](infra/azure-setup.sh), run by hand from the repo root. After that the pipeline does every deployment and nothing is created or changed in the portal.
+
+What it creates, all in the class resource group `rg-sdd-3b` and all prefixed `dpotec-ieu2024-`:
+
+| Resource | Name | Settings |
+|---|---|---|
+| SQL logical server | `dpotec-ieu2024-sql` | firewall rule "allow Azure services" only |
+| SQL database, content | `dpotec-ieu2024-content-db` | serverless, General Purpose Gen5, 0.5 to 1 vCore, auto-pause, 2 GB, local backups |
+| SQL database, scheduling | `dpotec-ieu2024-scheduling-db` | same |
+| Static Web App | `dpotec-ieu2024-ui` | Free plan |
+| Container Apps environment | `dpotec-ieu2024-env` | Consumption, no Log Analytics workspace |
+| Container App, content | `dpotec-ieu2024-content` | 0 to 1 replicas, public HTTPS ingress on port 8000 |
+| Container App, scheduling | `dpotec-ieu2024-scheduling` | same |
+
+Steps:
+
+1. `az login` with the IE account, and have Docker running (the script uses the SQL Server image to run `sqlcmd`).
+2. Choose three passwords, letters and digits only, and export them in the shell. They are not written to any file:
+   ```bash
+   export SQL_ADMIN_PASSWORD=...  CONTENT_DB_PASSWORD=...  SCHEDULING_DB_PASSWORD=...
+   ```
+3. Run `./infra/azure-setup.sh`. In order, it:
+   - creates the SQL server and the two serverless databases;
+   - opens the SQL firewall for this machine's IP, runs [`infra/azure-logins.sql`](infra/azure-logins.sql) on `master` (one login per service) and [`infra/azure-user.sql`](infra/azure-user.sql) on each database (a user for that service's login only), then removes the firewall rule;
+   - creates the Static Web App, whose hostname becomes `UI_ORIGIN`, the only origin CORS allows;
+   - creates the Container Apps environment and both apps on a placeholder image, with the database URL stored as a Container App secret and `CONTENT_URL` on scheduling pointing at the content app.
+4. Add the GitHub Actions secrets (repo Settings, Secrets and variables, Actions):
+
+   | Secret | Value |
+   |---|---|
+   | `AZURE_CREDENTIALS` | the class service principal JSON, provided by the professor |
+   | `SWA_DEPLOY_TOKEN` | output of `az staticwebapp secrets list -n dpotec-ieu2024-ui -g rg-sdd-3b --query properties.apiKey -o tsv` |
+   | `CI_SA_PASSWORD` | any strong password; used only by the throwaway SQL Server in CI |
+
+The script checks whether each resource exists before creating it, so it can be run again after a failure. It does not change an existing login's password: to change one, drop the login first. The database passwords exist in two places only: the shell that ran the script, and the Container App secret `database-url`. They never reach GitHub.
+
 ## Process
 
 - [`ADR.md`](ADR.md): the five architecture decision records (framework, domain split, schema, testing, what was left out).
