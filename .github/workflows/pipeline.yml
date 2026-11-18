@@ -131,3 +131,68 @@ jobs:
       - name: Stop the stack
         if: always()
         run: docker compose down -v
+
+  # Deployment. Runs only for a push to main, and only after every CI job above passed on this commit.
+  # It changes two things on Azure: the image of each Container App and the files of the Static Web App.
+  # Everything else was created once by infra/azure-setup.sh.
+  deploy:
+    needs: [test, validate-docs, images, integration]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      PREFIX: dpotec-ieu2024
+      RG: rg-sdd-3b
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Azure with the class service principal
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # The images job already pushed ghcr.io/dom-potec/sdd-flashcards-<service>:<this commit>.
+      # GIT_SHA is what /health reports as "version".
+      - name: Point both Container Apps at this commit's images
+        run: |
+          az extension add --name containerapp --only-show-errors
+          for service in content scheduling; do
+            az containerapp update -n "$PREFIX-$service" -g "$RG" \
+              --image "ghcr.io/dom-potec/sdd-flashcards-$service:$GITHUB_SHA" \
+              --set-env-vars "GIT_SHA=$GITHUB_SHA" -o none
+          done
+
+      - name: Write the services' public URLs into ui/config.js
+        run: |
+          fqdn() { az containerapp show -n "$PREFIX-$1" -g "$RG" --query properties.configuration.ingress.fqdn -o tsv; }
+          CONTENT_URL="https://$(fqdn content)"
+          SCHEDULING_URL="https://$(fqdn scheduling)"
+          printf 'window.CONFIG = {\n  CONTENT_URL: "%s",\n  SCHEDULING_URL: "%s",\n};\n' \
+            "$CONTENT_URL" "$SCHEDULING_URL" > ui/config.js
+          cat ui/config.js
+          echo "CONTENT_URL=$CONTENT_URL" >> "$GITHUB_ENV"
+          echo "SCHEDULING_URL=$SCHEDULING_URL" >> "$GITHUB_ENV"
+
+      - name: Upload the UI to the Static Web App
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOY_TOKEN }}
+          action: upload
+          app_location: ui
+          skip_app_build: true
+
+      # The deployment only counts if both services answer /health with this commit as their version.
+      # A 200 from an old replica is not enough. Five minutes allows for a cold start: the container
+      # starts, the database resumes from pause, and migrations run before the first answer.
+      - name: Health gate
+        run: |
+          deadline=$((SECONDS + 300))
+          for url in "$CONTENT_URL" "$SCHEDULING_URL"; do
+            until [ "$(curl -fsS --max-time 30 "$url/health" | jq -r .version)" = "$GITHUB_SHA" ]; do
+              if [ "$SECONDS" -ge "$deadline" ]; then
+                echo "::error::$url/health did not report version $GITHUB_SHA within 5 minutes"
+                exit 1
+              fi
+              sleep 10
+            done
+            echo "$url is healthy on $GITHUB_SHA"
+          done
