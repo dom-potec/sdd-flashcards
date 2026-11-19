@@ -103,22 +103,23 @@ Alternatives considered:
 
 Consequences: Orphan rows are limited to the number of deleted cards and cost nothing. Migrations only go forward, so a bad one is fixed with a new file, never by editing an applied one. A failing migration rolls back and the service does not start, so once deployed the health check will fail and the previous revision will stay active. If a migration damages data, Azure SQL will keep 7 days of point-in-time restore.
 
-## 8. Serverless hosting on Azure: Container Apps Consumption, SQL serverless, Static Web Apps, GHCR
+## 8. Serverless hosting on Azure: Container Apps Consumption, SQL serverless, Storage static website, GHCR
 
 Date: 2026-11-18
 
 Status: Decided
 
-Context: The brief allows only pay-per-use resources that cost nothing while idle, in a resource group shared by the class.
+Context: The brief allows only pay-per-use resources that cost nothing while idle. The deployment moved from a resource group shared by the class to my own Azure for Students subscription.
 
-Decision: The two services run as Container Apps on the Consumption plan with 0 to 1 replicas, so they cost nothing while idle. Each has an Azure SQL serverless database (0.5 to 1 vCore) that pauses when idle and is then billed for storage only. The UI is one Static Web App on the Free plan. The images are public on GitHub Container Registry, so Container Apps pulls them without credentials. `infra/azure-setup.sh` creates everything once with the Azure CLI, and after that the pipeline only changes each app's image and uploads the UI.
+Decision: The two services run as Container Apps on the Consumption plan with 0 to 1 replicas, so they cost nothing while idle. Each has an Azure SQL serverless database (0.5 to 1 vCore) on the free offer, which pauses it after 60 minutes idle. The UI is a static website served from a Storage account. The images are public on GitHub Container Registry, so Container Apps pulls them without credentials. The pipeline signs in to Azure as a managed identity through OIDC, so no Azure credential is stored in GitHub; the identity is Contributor on my resource group only and trusts only the `main` branch of this repository. `infra/azure-setup.sh` creates everything once with the Azure CLI, and after that the pipeline only updates each app's image and database secret and uploads the UI.
 
 Alternatives considered:
 - Azure Container Registry. Rejected: it has a fixed monthly fee.
 - Bicep or Terraform. Rejected for now: the setup is a few CLI commands run once. It would be worth it with a second environment.
 - A connection pool. Rejected: with one replica that scales to zero, pooled connections die with the replica and would keep the database awake.
+- A service principal with a secret stored in GitHub. Rejected: IE accounts cannot create service principals, and with OIDC there is no credential to leak or rotate.
 
-Consequences: The first request after idle is slow, because the container has to start and the database may have to resume, and connections fail until it does. The retries in `connect_with_retry`, gunicorn's 180 second timeout and the 5 minute health check after deploy are there so that this request is slow but still served. With one replica and one worker, migrations can never run twice at the same time. At 100 times the traffic I would raise the maximum replicas, which means migrations would need a lock, give the database more vCores or turn off auto-pause, and cache card lists in scheduling.
+Consequences: The first request after idle is slow, because the container has to start and the database may have to resume, and connections fail until it does. The free offer fixes the pause delay at 60 minutes, and a database that uses up its free monthly allowance pauses until the next month instead of being billed. The retries in `connect_with_retry`, gunicorn's 180 second timeout and the 5 minute health check after deploy are there so that this request is slow but still served. With one replica and one worker, migrations can never run twice at the same time. At 100 times the traffic I would raise the maximum replicas, which means migrations would need a lock, give the database more vCores or turn off auto-pause, and cache card lists in scheduling.
 
 ## 9. Pipeline gates and the cross-seam test
 

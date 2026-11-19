@@ -68,18 +68,23 @@ jobs:
       - name: Validate OpenAPI documents
         run: openapi-spec-validator services/content/openapi.yaml services/scheduling/openapi.yaml
 
-      # The professor withdrew system.schema.json, so there is no schema to validate against.
-      # This still fails if system.yaml is not valid YAML, lost a service, or points at a missing file.
-      - name: Check system.yaml
+      # system.schema.json is the professor's file, copied unchanged. This fails if system.yaml breaks
+      # the schema, or if it points at a service folder, OpenAPI document or migrations folder that is missing.
+      - name: Validate system.yaml against system.schema.json
         run: |
           python - <<'PY'
-          import os, yaml
+          import json, os, yaml
+          from jsonschema import Draft202012Validator
           system = yaml.safe_load(open("system.yaml"))
-          assert set(system["services"]) == {"content", "scheduling"}, list(system["services"])
+          schema = json.load(open("system.schema.json"))
+          errors = sorted(Draft202012Validator(schema).iter_errors(system), key=lambda e: list(e.path))
+          for error in errors:
+              print("/".join(map(str, error.path)) or "(root)", "-", error.message)
+          assert not errors, f"{len(errors)} schema error(s) in system.yaml"
           for name, service in system["services"].items():
               for key in ("path", "openapi", "migrations"):
                   assert os.path.exists(service[key]), f"{name}.{key}: {service[key]} does not exist"
-          print("system.yaml is valid YAML and its paths exist")
+          print("system.yaml matches system.schema.json and its paths exist")
           PY
 
   # Builds the image of every service. A Dockerfile that does not build fails the pipeline.
@@ -108,6 +113,7 @@ jobs:
         with:
           context: services/${{ matrix.service }}
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          provenance: false   # a plain image manifest, which Container Apps can pull from GHCR
           tags: ghcr.io/dom-potec/sdd-flashcards-${{ matrix.service }}:${{ github.sha }}
 
   # Starts the whole system with docker compose on the runner and tests it across the two services,
@@ -142,29 +148,44 @@ jobs:
         run: docker compose down -v
 
   # Deployment. Runs only for a push to main, and only after every CI job above passed on this commit.
-  # It changes two things on Azure: the image of each Container App and the files of the Static Web App.
-  # Everything else was created once by infra/azure-setup.sh.
+  # It changes two things on Azure: the image of each Container App and the files of the UI's storage
+  # static website. Everything else was created once by infra/azure-setup.sh.
   deploy:
     needs: [test, validate-docs, images, integration]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # lets the job ask GitHub for the OIDC token that Azure trusts
+      contents: read
     env:
-      PREFIX: dpotec-ieu2024
-      RG: rg-sdd-3b
+      PREFIX: ${{ vars.PREFIX }}
+      RG: ${{ vars.RESOURCE_GROUP }}
+      UI_STORAGE: ${{ vars.UI_STORAGE }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Log in to Azure with the class service principal
+      # No stored credential: the job signs in as the managed identity <prefix>-github, which trusts
+      # tokens GitHub issues for the main branch of this repository.
+      - name: Log in to Azure as the pipeline's managed identity (OIDC)
         uses: azure/login@v2
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       # The images job already pushed ghcr.io/dom-potec/sdd-flashcards-<service>:<this commit>.
-      # GIT_SHA is what /health reports as "version".
+      # The connection string is built from the GitHub secret and stored as the app's own secret;
+      # DATABASE_URL refers to it. GIT_SHA is what /health reports as "version".
       - name: Point both Container Apps at this commit's images
+        env:
+          CONTENT_DB_PASSWORD: ${{ secrets.CONTENT_DB_PASSWORD }}
+          SCHEDULING_DB_PASSWORD: ${{ secrets.SCHEDULING_DB_PASSWORD }}
         run: |
           az extension add --name containerapp --only-show-errors
           for service in content scheduling; do
+            password_var=$(echo "${service}_DB_PASSWORD" | tr a-z A-Z)
+            url="mssql://${service}_user:${!password_var}@$PREFIX-sql.database.windows.net:1433/$PREFIX-$service-db"
+            az containerapp secret set -n "$PREFIX-$service" -g "$RG" --secrets "database-url=$url" -o none
             az containerapp update -n "$PREFIX-$service" -g "$RG" \
               --image "ghcr.io/dom-potec/sdd-flashcards-$service:$GITHUB_SHA" \
               --set-env-vars "GIT_SHA=$GITHUB_SHA" -o none
@@ -181,13 +202,12 @@ jobs:
           echo "CONTENT_URL=$CONTENT_URL" >> "$GITHUB_ENV"
           echo "SCHEDULING_URL=$SCHEDULING_URL" >> "$GITHUB_ENV"
 
-      - name: Upload the UI to the Static Web App
-        uses: Azure/static-web-apps-deploy@v1
-        with:
-          azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOY_TOKEN }}
-          action: upload
-          app_location: ui
-          skip_app_build: true
+      # $web is the container a storage static website serves. no-cache makes browsers ask again, so
+      # a new config.js or app.js is used straight after a deployment.
+      - name: Upload the UI to the storage static website
+        run: |
+          az storage blob upload-batch --account-name "$UI_STORAGE" --auth-mode key \
+            --destination '$web' --source ui --overwrite --content-cache-control no-cache -o none
 
       # The deployment only counts if both services answer /health with this commit as their version.
       # A 200 from an old replica is not enough. Five minutes allows for a cold start: the container

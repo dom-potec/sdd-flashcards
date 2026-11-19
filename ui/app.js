@@ -6,15 +6,40 @@ const SCHEDULING = window.CONFIG.SCHEDULING_URL;
 
 const GRADES = ["Blackout", "Wrong", "Almost", "Hard", "Good", "Easy"]; // index = grade 0-5
 
+// On Azure the services scale to zero. The first request after a quiet period gets no usable answer
+// while the container starts and the database resumes: either the browser reports a network error, or
+// Azure itself answers 502/503/504 without the JSON body the services always send.
+const STARTUP_RETRIES = 6;
+const STARTUP_WAIT_MS = 5000;
+const STARTING_UP = "The service is starting up. This can take a minute";
+
 // One request to a service. Returns the parsed JSON (null for 204 No Content).
-// Throws an Error carrying the service's own message when the status is not 2xx,
-// and fetch itself throws when the service cannot be reached at all.
+// Throws an Error carrying the service's own message when the status is not 2xx.
+// While a service is starting up, a GET is tried again every few seconds and the page says so.
+// Anything that writes is not repeated, so nothing is saved twice: the user is asked to try again.
 async function api(base, path, options = {}) {
-  const res = await fetch(base + path, { headers: { "Content-Type": "application/json" }, ...options });
-  if (res.status === 204) return null;
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-  return body;
+  const isRead = !options.method || options.method === "GET";
+  for (let attempt = 0; ; attempt++) {
+    let res = null;
+    let body = {};
+    try {
+      res = await fetch(base + path, { headers: { "Content-Type": "application/json" }, ...options });
+      if (res.status === 204) return null;
+      body = await res.json().catch(() => ({}));
+    } catch (e) {
+      res = null; // the service could not be reached at all
+    }
+    const startingUp = !res || (res.status >= 502 && res.status <= 504 && !body.error);
+    if (!startingUp) {
+      if (attempt > 0) clearNotice();
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+      return body;
+    }
+    if (!isRead) throw new Error(`${STARTING_UP}, then try again`);
+    if (attempt >= STARTUP_RETRIES) throw new Error("the service did not answer, try again in a minute");
+    showNotice(`${STARTING_UP}, retrying…`);
+    await new Promise((resolve) => setTimeout(resolve, STARTUP_WAIT_MS));
+  }
 }
 
 function byId(id) {
