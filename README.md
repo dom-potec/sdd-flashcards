@@ -147,11 +147,54 @@ One GitHub Actions workflow, [`.github/workflows/pipeline.yml`](.github/workflow
 | Job | Runs | Fails when |
 |---|---|---|
 | `test` | once per service, against a throwaway SQL Server container | flake8 reports a problem, a test fails, or coverage of `app/` is below 70% |
-| `validate-docs` | once | an `openapi.yaml` is not valid OpenAPI, or `system.yaml` does not match `system.schema.json` |
+| `validate-docs` | once | an `openapi.yaml` is not valid OpenAPI, or `system.yaml` does not match `system.schema.json` or names a path that does not exist |
 | `images` | once per service | the Dockerfile does not build; on `main` it also pushes the image to GHCR tagged with the commit SHA |
 | `integration` | once | the compose stack does not become healthy, or a test in `tests/integration` fails, including the one that stops the content service |
 
 CI never touches Azure SQL: the `test` job and the compose stack each use their own local SQL Server. Evidence of a failed run that was fixed is in [`docs/evidence/pipeline.md`](docs/evidence/pipeline.md).
+
+## Azure initial setup
+
+Live system: <https://dpotecieu2024ui.z1.web.core.windows.net>. The first request after a quiet period is slow, because the containers and the databases start again.
+
+The system runs in my own Azure for Students subscription and follows the course's A2 deployment guide. Everything is created once by [`infra/azure-setup.sh`](infra/azure-setup.sh), run by hand from the repo root. Every `az` and `gh` command of the setup is in that script. After it, the pipeline does every deployment and nothing is created or changed in the portal.
+
+What it creates, all in the resource group `rg-dpotec-ieu2024`:
+
+| Resource | Name | Settings |
+|---|---|---|
+| Storage account | `dpotecieu2024ui` | StorageV2, Standard_LRS, static website with `index.html`: the UI |
+| SQL logical server | `dpotec-ieu2024-sql` | firewall rule "allow Azure services" only |
+| SQL database, content | `dpotec-ieu2024-content-db` | serverless, General Purpose Gen5, 0.5 to 1 vCore, local backups, free offer (pauses after 60 idle minutes) |
+| SQL database, scheduling | `dpotec-ieu2024-scheduling-db` | same |
+| Container Apps environment | `dpotec-ieu2024-env` | Consumption; Azure creates its Log Analytics workspace with it |
+| Container App, content | `dpotec-ieu2024-content` | 0 to 1 replicas, public HTTPS ingress on port 8000 |
+| Container App, scheduling | `dpotec-ieu2024-scheduling` | same |
+| Managed identity | `dpotec-ieu2024-github` | Contributor on this resource group only; the pipeline signs in as it |
+
+Steps:
+
+1. `az login` with the IE account and `az account set --subscription <the Azure for Students id>`. Have `gh` signed in as the repository owner and Docker running (the script uses the SQL Server image to run `sqlcmd`).
+2. Run `./infra/azure-setup.sh`. It shows the subscription, region and repository and asks before creating anything. In order, it:
+   - registers the resource providers and creates the resource group;
+   - creates the storage account and turns on its static website. The web endpoint becomes `UI_ORIGIN`, the only origin CORS allows; CORS is done by the services themselves, and the Container Apps ingress CORS setting stays off;
+   - creates the SQL server and the two serverless databases on the free offer;
+   - opens the SQL firewall for this machine's IP, runs [`infra/azure-user.sql`](infra/azure-user.sql) on each database (a contained user that exists in that database only, with the roles needed to run migrations and read and write data), then removes the firewall rule;
+   - creates the Container Apps environment and both apps on a placeholder image, with the database URL stored as a Container App secret and `CONTENT_URL` on scheduling pointing at the content app;
+   - creates the managed identity, makes it Contributor on the resource group, and adds two federated credentials for the `main` branch of this repository (GitHub can name the repository by name or by numeric id);
+   - stores what the pipeline needs in GitHub (table below);
+   - gives the two professors the Reader role on the resource group.
+
+| GitHub Actions | Name | Value |
+|---|---|---|
+| secret | `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` | which identity, directory and subscription the pipeline signs in to. There is no stored Azure password: Azure trusts the token GitHub issues for `main` (OIDC) |
+| secret | `CONTENT_DB_PASSWORD`, `SCHEDULING_DB_PASSWORD` | the password of each service's database user; the deploy job builds each `DATABASE_URL` from it |
+| secret | `CI_SA_PASSWORD` | any strong password; used only by the throwaway SQL Server in CI. Set by hand, not by the script |
+| variable | `PREFIX`, `RESOURCE_GROUP`, `UI_STORAGE` | `dpotec-ieu2024`, `rg-dpotec-ieu2024`, `dpotecieu2024ui` |
+
+The script keeps resources that already exist, so it can be run again after a failure. The three passwords (SQL administrator and the two database users) are generated inside the script, sent to Azure and to GitHub secrets, and never typed, printed or written to a file. Running the script again sets new ones everywhere.
+
+On every push to `main`, after all CI jobs pass, the `deploy` job points each Container App at the image of that commit, writes the services' addresses into `ui/config.js`, uploads `ui/` to the storage account's `$web` container, and fails unless `/health` of both services reports that commit within five minutes.
 
 ## Process
 

@@ -1,13 +1,15 @@
 # yaml-language-server: $schema=./system.schema.json
+# The system in one file: services, their configuration, the call across the seam and the Azure resources.
+# Validated against system.schema.json in CI by the validate-docs job.
 student: dpotec.ieu2024
 prefix: dpotec-ieu2024
-# public_url: TODO, the Static Web App hostname, known after the first Azure deployment
+public_url: https://dpotecieu2024ui.z1.web.core.windows.net
 ui:
   path: ui
-  static_web_app: dpotec-ieu2024-ui
+  storage_account: dpotecieu2024ui
   calls: [content, scheduling]
 azure:
-  resource_group: rg-sdd-3b
+  resource_group: rg-dpotec-ieu2024
   container_apps_environment: dpotec-ieu2024-env
   sql_server: dpotec-ieu2024-sql
   registry: ghcr.io/dom-potec
