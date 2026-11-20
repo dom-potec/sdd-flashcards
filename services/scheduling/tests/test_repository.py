@@ -132,8 +132,25 @@ def test_no_foreign_key_so_rows_for_a_deleted_card_stay(conn):
 def test_get_schedule(conn):
     assert s.get_schedule(conn, IDS[0]) == {
         "card_id": IDS[0], "ease_factor": 2.5, "repetitions": 0, "interval_days": 0, "due_at": None,
+        "lapses": 0,
     }
     s.record_review(conn, IDS[0], 5, TODAY)
     assert s.get_schedule(conn, IDS[0]) == {
         "card_id": IDS[0], "ease_factor": 2.6, "repetitions": 1, "interval_days": 1, "due_at": TOMORROW,
+        "lapses": 0,
     }
+
+
+def test_lapses_count_wrong_answers_only(conn):
+    s.record_review(conn, IDS[0], 5, TODAY)
+    assert s.get_schedule(conn, IDS[0])["lapses"] == 0
+    s.record_review(conn, IDS[0], 2, TODAY)
+    s.record_review(conn, IDS[0], 3, TODAY)  # 3 is a pass, not a lapse
+    s.record_review(conn, IDS[0], 0, TODAY)
+    assert s.get_schedule(conn, IDS[0])["lapses"] == 2
+
+
+def test_first_review_wrong_starts_lapses_at_one(conn):
+    s.record_review(conn, IDS[1], 1, TODAY)
+    assert s.get_schedule(conn, IDS[1])["lapses"] == 1
+    assert s.get_schedule(conn, IDS[0])["lapses"] == 0  # another card is not touched

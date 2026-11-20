@@ -30,7 +30,7 @@ def get_schedule(conn: pymssql.Connection, card_id: int) -> dict:
     """The schedule row of a card as a dict. A card that was never reviewed has due_at None."""
     cur = conn.cursor()
     cur.execute(
-        "SELECT card_id, ease_factor, repetitions, interval_days, due_at "
+        "SELECT card_id, ease_factor, repetitions, interval_days, due_at, lapses "
         "FROM card_schedule WHERE card_id = %s",
         (card_id,),
     )
@@ -43,6 +43,7 @@ def get_schedule(conn: pymssql.Connection, card_id: int) -> dict:
             "repetitions": new.repetitions,
             "interval_days": new.interval_days,
             "due_at": None,
+            "lapses": 0,
         }
     return row
 
@@ -53,21 +54,23 @@ def record_review(conn: pymssql.Connection, card_id: int, grade: int, today: dat
     before = get_state(conn, card_id)
     after = next_state(before, grade)  # raises ValueError for a grade outside 0-5, before any write
     due = due_date(today, after.interval_days)
+    lapse = 1 if grade < 3 else 0  # a wrong answer; counted in card_schedule.lapses (migration 002)
     cur = conn.cursor()
     try:
         # Upsert: try the UPDATE; @@ROWCOUNT is 0 when the card has no row yet, so INSERT it.
         cur.execute(
             """
             UPDATE card_schedule
-            SET ease_factor = %s, repetitions = %s, interval_days = %s, due_at = %s
+            SET ease_factor = %s, repetitions = %s, interval_days = %s, due_at = %s,
+                lapses = lapses + %s
             WHERE card_id = %s;
             IF @@ROWCOUNT = 0
-                INSERT INTO card_schedule (card_id, ease_factor, repetitions, interval_days, due_at)
-                VALUES (%s, %s, %s, %s, %s);
+                INSERT INTO card_schedule (card_id, ease_factor, repetitions, interval_days, due_at, lapses)
+                VALUES (%s, %s, %s, %s, %s, %s);
             """,
             (
-                after.ease_factor, after.repetitions, after.interval_days, due, card_id,
-                card_id, after.ease_factor, after.repetitions, after.interval_days, due,
+                after.ease_factor, after.repetitions, after.interval_days, due, lapse, card_id,
+                card_id, after.ease_factor, after.repetitions, after.interval_days, due, lapse,
             ),
         )
         cur.execute(

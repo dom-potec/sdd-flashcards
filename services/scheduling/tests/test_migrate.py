@@ -1,9 +1,16 @@
+import os
+import shutil
+
 import pytest
 
 from app import db, migrate
 from tests.conftest import MIGRATIONS_DIR, recreate_database, url_for_database
 
 SCRATCH = "scheduling_migrate_test"
+# The columns card_schedule had before migration 002.
+OLD_COLUMNS = (
+    "SELECT card_id, ease_factor, repetitions, interval_days, due_at FROM card_schedule ORDER BY card_id"
+)
 
 
 @pytest.fixture
@@ -21,8 +28,8 @@ def table_exists(conn, name: str) -> bool:
     return cur.fetchone()["id"] is not None
 
 
-def test_fresh_database_gets_001_init(fresh_conn):
-    assert migrate.apply_pending(fresh_conn, MIGRATIONS_DIR) == ["001_init"]
+def test_fresh_database_gets_every_migration(fresh_conn):
+    assert migrate.apply_pending(fresh_conn, MIGRATIONS_DIR) == ["001_init", "002_add_lapses"]
     assert table_exists(fresh_conn, "card_schedule")
     assert table_exists(fresh_conn, "reviews")
     assert table_exists(fresh_conn, "health_probe")
@@ -33,7 +40,39 @@ def test_second_run_applies_nothing(fresh_conn):
     assert migrate.apply_pending(fresh_conn, MIGRATIONS_DIR) == []
     cur = fresh_conn.cursor()
     cur.execute("SELECT version FROM schema_migrations")
-    assert [row["version"] for row in cur.fetchall()] == ["001_init"]
+    assert [row["version"] for row in cur.fetchall()] == ["001_init", "002_add_lapses"]
+
+
+def test_002_keeps_existing_rows_and_backfills_lapses(fresh_conn, tmp_path):
+    """The database as it was before 002: only 001 applied, with schedule rows and reviews in it."""
+    shutil.copy(os.path.join(MIGRATIONS_DIR, "001_init.sql"), tmp_path)
+    assert migrate.apply_pending(fresh_conn, str(tmp_path)) == ["001_init"]
+    cur = fresh_conn.cursor()
+    cur.execute(
+        "INSERT INTO card_schedule (card_id, ease_factor, repetitions, interval_days, due_at) VALUES "
+        "(1, 2.36, 0, 1, '2026-11-20'), (2, 2.6, 2, 6, '2026-11-25'), (3, 2.5, 1, 1, '2026-11-20')"
+    )
+    cur.execute(
+        "INSERT INTO reviews (card_id, grade, interval_before, interval_after) VALUES "
+        "(1, 4, 0, 1), (1, 1, 1, 1), (1, 0, 1, 1), "  # card 1: two wrong answers
+        "(2, 5, 0, 1), (2, 3, 1, 6), "                # card 2: none (3 is a pass)
+        "(3, 2, 0, 1), (3, 4, 1, 1), "                # card 3: one
+        "(9, 1, 0, 1)"                                # a review of a card with no schedule row
+    )
+    fresh_conn.commit()
+    cur.execute(OLD_COLUMNS)
+    before = cur.fetchall()
+
+    assert migrate.apply_pending(fresh_conn, MIGRATIONS_DIR) == ["002_add_lapses"]
+
+    cur.execute(OLD_COLUMNS)
+    assert cur.fetchall() == before  # every row is still there, with the same values
+    cur.execute("SELECT card_id, lapses FROM card_schedule ORDER BY card_id")
+    assert cur.fetchall() == [
+        {"card_id": 1, "lapses": 2}, {"card_id": 2, "lapses": 0}, {"card_id": 3, "lapses": 1},
+    ]
+    cur.execute("SELECT COUNT(*) AS n FROM reviews")
+    assert cur.fetchone()["n"] == 8  # the log is not touched
 
 
 def test_migrations_run_in_name_order_and_only_new_ones(fresh_conn, tmp_path):
