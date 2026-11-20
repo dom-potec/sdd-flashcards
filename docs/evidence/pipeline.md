@@ -18,3 +18,14 @@
 - `test_repository.py::test_create_deck_blank_name_raises`: `DID NOT RAISE ValueError`
 
 **The fix.** Commit `3f5a3e9` restores the line, and all five jobs pass again.
+
+## Successful deployments from `main`
+
+| Commit on `main` | Run | What it deployed |
+|---|---|---|
+| `3004d9f` | https://github.com/dom-potec/sdd-flashcards/actions/runs/44544966323 | the first deployment to Azure (19 Nov) |
+| `1693219` | https://github.com/dom-potec/sdd-flashcards/actions/runs/44755391761 | migration `002_add_lapses` (20 Nov), see [`migration.md`](migration.md) |
+
+In both runs every CI job passed first, then the `deploy` job, whose last step waits until `/health` of
+both services reports the deployed commit.
+
