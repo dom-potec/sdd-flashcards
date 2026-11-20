@@ -119,7 +119,7 @@ Alternatives considered:
 - A connection pool. Rejected: with one replica that scales to zero, pooled connections die with the replica and would keep the database awake.
 - A service principal with a secret stored in GitHub. Rejected: IE accounts cannot create service principals, and with OIDC there is no credential to leak or rotate.
 
-Consequences: The first request after idle is slow, because the container has to start and the database may have to resume, and connections fail until it does. The free offer fixes the pause delay at 60 minutes, and a database that uses up its free monthly allowance pauses until the next month instead of being billed. The retries in `connect_with_retry`, gunicorn's 180 second timeout and the 5 minute health check after deploy are there so that this request is slow but still served. With one replica and one worker, migrations can never run twice at the same time. At 100 times the traffic I would raise the maximum replicas, which means migrations would need a lock, give the database more vCores or turn off auto-pause, and cache card lists in scheduling.
+Consequences: The first request after idle is slow, because the container has to start and the database may have to resume, and connections fail until it does. The free offer fixes the pause delay at 60 minutes, and a database that uses up its free monthly allowance pauses until the next month instead of being billed. The retries in `connect_with_retry`, gunicorn's 180 second timeout and the 5 minute health check after deploy are there so that this request is slow but still served. With one replica and one worker, migrations can never run twice at the same time. At 100 times the traffic I would raise the maximum replicas, which means migrations would need a lock, give the database more vCores or turn off auto-pause, and cache card lists in scheduling. Measured on 20 Nov, first connect took 66s on content and 60s on scheduling, 0 errors.
 
 ## 9. Pipeline gates and the cross-seam test
 
@@ -137,4 +137,21 @@ Alternatives considered:
 - Separate CI and CD workflows. Rejected: one file with `needs` is easier to read and guarantees the deploy runs only if CI passed on the same commit.
 
 Consequences: CI takes a few minutes because of the SQL Server image. I do not test the UI JavaScript, the Azure deployment beyond the health check after deploy, or load.
+
+## 10. Not built: an API gateway in front of the two services
+
+Date: 2026-11-20
+
+Status: Decided
+
+Context: The browser calls two services at two addresses. So each service handles CORS, the UI needs two URLs in its config, and a login would have to be added twice. A gateway would give one address and one place for login, rate limiting and routing.
+
+Decision: I did not build a gateway. The UI calls both services directly. Each service allows only the UI's origin through CORS, and the deploy job writes the two service URLs into `ui/config.js`.
+
+Alternatives considered:
+- A third container with nginx or a small Flask proxy. Rejected: the brief allows exactly two service containers, and it would have to run all the time in front of two apps that scale to zero.
+- Routing by path with the Container Apps ingress. Rejected: on the Consumption plan that needs Azure Front Door, which has a fixed cost.
+
+Consequences: There are two public hostnames and two CORS settings to keep right. I would revisit this with user accounts, more than two services, rate limits per client, or a need to hide the service hostnames.
+
 

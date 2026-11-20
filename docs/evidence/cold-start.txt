@@ -1,0 +1,9 @@
+Cold start of the live system, measured 2026-11-20T13:57Z with curl, after a night without requests.
+Before the first request: both databases had status Paused and the content app had 0 replicas.
+Deployed version: 3004d9f
+
+GET <content>/health     first request answered 200 {"db":"ok"} after 66.3 s
+GET <scheduling>/health  first request answered 200 {"db":"ok"} after 60.2 s
+
+Neither request got a 503: the container started, the connection retries waited for the database
+to resume, and the same first request was answered.
