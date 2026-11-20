@@ -152,13 +152,14 @@ components:
         grade: { type: integer, minimum: 0, maximum: 5, description: "0 blackout to 5 easy; below 3 is a lapse" }
     ScheduleState:
       type: object
-      required: [card_id, ease_factor, repetitions, interval_days, due_at]
+      required: [card_id, ease_factor, repetitions, interval_days, due_at, lapses]
       properties:
         card_id: { type: integer }
         ease_factor: { type: number, example: 2.5 }
         repetitions: { type: integer }
         interval_days: { type: integer }
         due_at: { type: string, format: date, nullable: true, example: "2026-11-14" }
+        lapses: { type: integer, minimum: 0, description: "How many times the card was answered wrong (a grade below 3)" }
     Error:
       type: object
       required: [error]

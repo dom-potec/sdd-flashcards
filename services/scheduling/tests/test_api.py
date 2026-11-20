@@ -63,6 +63,7 @@ def test_study_flow_next_review_next_done(client, content_up):
     assert res.status_code == 201
     assert res.get_json() == {
         "card_id": 101, "ease_factor": 2.6, "repetitions": 1, "interval_days": 1, "due_at": TOMORROW,
+        "lapses": 0,
     }
 
     second = client.get(f"/study/{DECK}/next").get_json()
@@ -101,6 +102,7 @@ def test_reviews_and_schedule_keep_working_when_content_is_unavailable(client, c
 def test_schedule_of_a_card_never_reviewed(client):
     assert client.get("/cards/555/schedule").get_json() == {
         "card_id": 555, "ease_factor": 2.5, "repetitions": 0, "interval_days": 0, "due_at": None,
+        "lapses": 0,
     }
 
 
@@ -150,3 +152,9 @@ def test_each_request_is_logged_once(client, caplog):
     lines = [r.getMessage() for r in caplog.records if r.name == "request"]
     assert len(lines) == 1
     assert lines[0].startswith("GET /cards/101/schedule 200 ")
+
+
+def test_wrong_answer_is_counted_in_lapses(client):
+    assert client.post("/reviews", json={"card_id": 101, "grade": 1}).get_json()["lapses"] == 1
+    assert client.post("/reviews", json={"card_id": 101, "grade": 4}).get_json()["lapses"] == 1
+    assert client.get("/cards/101/schedule").get_json()["lapses"] == 1
