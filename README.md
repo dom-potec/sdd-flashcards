@@ -140,6 +140,12 @@ The browser talks to one Flask process. The two domains are sibling packages tha
 
 Four tables in one SQLite file. `decks` and `cards` belong to Content; `card_schedule` (one current-state row per card, created on its first review) and `reviews` (append-only log of every grade) belong to Scheduling. The only link between the domains is the foreign key from the two scheduling tables to `cards.id`, with `ON DELETE CASCADE` so deleting a card or deck removes its schedule and history. See ADR-3.
 
+## Migrations
+
+Each service has numbered SQL files in its `migrations/` folder. At startup `app/migrate.py` applies, in order, the ones not yet listed in the service's `schema_migrations` table, each in one transaction. An applied file is never edited; a change is a new file.
+
+`services/scheduling/migrations/002_add_lapses.sql` changed a table that already held data on Azure: it adds `lapses` to `card_schedule` and fills it from the existing `reviews`. The evidence is in [`docs/evidence/migration.md`](docs/evidence/migration.md): the deployment run, the startup log line `applied migration 002_add_lapses`, and the live data before and after, with all five rows kept and the two cards that had been answered wrong showing `lapses` 1.
+
 ## Pipeline
 
 One GitHub Actions workflow, [`.github/workflows/pipeline.yml`](.github/workflows/pipeline.yml), runs on every push to any branch and on every pull request to `main`. A job that fails makes the run red, and a red pull request is not merged.
