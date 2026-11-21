@@ -1,0 +1,60 @@
+$ date -u
+2026-11-21T13:19:05Z
+
+$ docker compose pause content     # the container is frozen: it accepts no request and never answers
+ Container pf-evidence-content-1  Paused
+
+$ curl -i http://localhost:18001/study/1/next
+HTTP/1.1 503 SERVICE UNAVAILABLE
+Server: gunicorn
+Date: Sat, 21 Nov 2026 13:19:07 GMT
+Connection: keep-alive
+Content-Type: application/json
+Content-Length: 40
+Access-Control-Allow-Origin: http://localhost:18080
+
+{"error":"content service unavailable"}
+
+[503 in 2.029345 s]
+
+$ curl -i http://localhost:18001/study/1/due-count
+HTTP/1.1 503 SERVICE UNAVAILABLE
+Server: gunicorn
+Date: Sat, 21 Nov 2026 13:19:09 GMT
+Connection: keep-alive
+Content-Type: application/json
+Content-Length: 40
+Access-Control-Allow-Origin: http://localhost:18080
+
+{"error":"content service unavailable"}
+
+[503 in 2.011246 s]
+
+$ curl -i -X POST http://localhost:18001/reviews -d '{"card_id":1,"grade":5}'
+HTTP/1.1 201 CREATED
+Server: gunicorn
+Date: Sat, 21 Nov 2026 13:19:09 GMT
+Connection: keep-alive
+Content-Type: application/json
+Content-Length: 99
+Access-Control-Allow-Origin: http://localhost:18080
+
+{"card_id":1,"due_at":"2026-11-27","ease_factor":2.6,"interval_days":6,"lapses":0,"repetitions":2}
+
+[201 in 0.041493 s]
+
+$ docker compose unpause content
+ Container pf-evidence-content-1  Unpaused
+
+$ curl -i http://localhost:18001/study/1/next
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Sat, 21 Nov 2026 13:19:09 GMT
+Connection: keep-alive
+Content-Type: application/json
+Content-Length: 28
+Access-Control-Allow-Origin: http://localhost:18080
+
+{"done":true,"remaining":0}
+
+[200 in 0.019077 s]

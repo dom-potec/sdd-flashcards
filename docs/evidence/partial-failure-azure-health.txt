@@ -1,0 +1,21 @@
+$ date -u
+2026-11-21T13:23:21Z
+
+$ az containerapp replica list -n dpotec-ieu2024-content -g rg-dpotec-ieu2024 --query 'length(@)'      # running content containers
+0
+
+$ curl -i https://dpotec-ieu2024-scheduling.salmondune-8bbbfcb6.swedencentral.azurecontainerapps.io/health
+HTTP/2 200 
+content-type: application/json
+access-control-allow-origin: https://dpotecieu2024ui.z1.web.core.windows.net
+content-length: 79
+
+{"db":"ok","status":"ok","version":"ff2f3fbfdabc668bf5e43bfae8e5c909e4bd1f80"}
+
+[200 in 45.380108 s]
+
+$ az containerapp replica list -n dpotec-ieu2024-scheduling -g rg-dpotec-ieu2024 --query 'length(@)'
+1
+
+$ az containerapp replica list -n dpotec-ieu2024-content -g rg-dpotec-ieu2024 --query 'length(@)'      # still none: /health did not call content
+0

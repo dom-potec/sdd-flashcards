@@ -1,0 +1,82 @@
+$ date -u
+2026-11-21T13:18:44Z
+
+$ docker compose stop content
+ Container pf-evidence-content-1  Stopped
+
+$ docker compose ps --format '{{.Service}} {{.State}}'
+content exited
+db-init exited
+scheduling running
+sqlserver running
+ui running
+
+$ curl -i http://localhost:18001/study/1/next
+HTTP/1.1 503 SERVICE UNAVAILABLE
+Server: gunicorn
+Date: Sat, 21 Nov 2026 13:18:45 GMT
+Connection: keep-alive
+Content-Type: application/json
+Content-Length: 40
+Access-Control-Allow-Origin: http://localhost:18080
+
+{"error":"content service unavailable"}
+
+[503 in 0.021079 s]
+
+$ curl -i http://localhost:18001/study/1/due-count
+HTTP/1.1 503 SERVICE UNAVAILABLE
+Server: gunicorn
+Date: Sat, 21 Nov 2026 13:18:45 GMT
+Connection: keep-alive
+Content-Type: application/json
+Content-Length: 40
+Access-Control-Allow-Origin: http://localhost:18080
+
+{"error":"content service unavailable"}
+
+[503 in 0.003496 s]
+
+$ curl -i http://localhost:18001/health
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Sat, 21 Nov 2026 13:18:45 GMT
+Connection: keep-alive
+Content-Type: application/json
+Content-Length: 44
+Access-Control-Allow-Origin: http://localhost:18080
+
+{"db":"ok","status":"ok","version":"local"}
+
+[200 in 0.012639 s]
+
+$ curl -i -X POST http://localhost:18001/reviews -d '{"card_id":2,"grade":2}'
+HTTP/1.1 201 CREATED
+Server: gunicorn
+Date: Sat, 21 Nov 2026 13:18:45 GMT
+Connection: keep-alive
+Content-Type: application/json
+Content-Length: 99
+Access-Control-Allow-Origin: http://localhost:18080
+
+{"card_id":2,"due_at":"2026-11-22","ease_factor":2.5,"interval_days":1,"lapses":1,"repetitions":0}
+
+[201 in 0.011781 s]
+
+$ curl -i http://localhost:18001/cards/2/schedule
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Sat, 21 Nov 2026 13:18:45 GMT
+Connection: keep-alive
+Content-Type: application/json
+Content-Length: 99
+Access-Control-Allow-Origin: http://localhost:18080
+
+{"card_id":2,"due_at":"2026-11-22","ease_factor":2.5,"interval_days":1,"lapses":1,"repetitions":0}
+
+[200 in 0.007567 s]
+
+$ curl -i http://localhost:18000/decks
+
+[000 in 0.000178 s]
+curl exit code: 7

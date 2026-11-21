@@ -17,7 +17,9 @@ const STARTING_UP = "The service is starting up. This can take a minute";
 // Throws an Error carrying the service's own message when the status is not 2xx.
 // While a service is starting up, a GET is tried again every few seconds and the page says so.
 // Anything that writes is not repeated, so nothing is saved twice: the user is asked to try again.
-async function api(base, path, options = {}) {
+// quiet: for a request the page can do without. It is still retried, but it never touches the notice,
+// so it cannot hide the message of a request that matters.
+async function api(base, path, options = {}, quiet = false) {
   const isRead = !options.method || options.method === "GET";
   for (let attempt = 0; ; attempt++) {
     let res = null;
@@ -31,13 +33,13 @@ async function api(base, path, options = {}) {
     }
     const startingUp = !res || (res.status >= 502 && res.status <= 504 && !body.error);
     if (!startingUp) {
-      if (attempt > 0) clearNotice();
+      if (attempt > 0 && !quiet) clearNotice();
       if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
       return body;
     }
     if (!isRead) throw new Error(`${STARTING_UP}, then try again`);
     if (attempt >= STARTUP_RETRIES) throw new Error("the service did not answer, try again in a minute");
-    showNotice(`${STARTING_UP}, retrying…`);
+    if (!quiet) showNotice(`${STARTING_UP}, retrying…`);
     await new Promise((resolve) => setTimeout(resolve, STARTUP_WAIT_MS));
   }
 }
@@ -258,7 +260,7 @@ function initStudy() {
     byId("show-answer").hidden = true;
   });
   // The deck name is only a heading. If content cannot give it, the page still works.
-  api(CONTENT, `/decks/${deckId}`)
+  api(CONTENT, `/decks/${deckId}`, {}, true)
     .then((deck) => {
       byId("deck-name").textContent = `Study: ${deck.name}`;
     })
