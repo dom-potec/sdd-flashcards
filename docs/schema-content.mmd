@@ -1,0 +1,27 @@
+erDiagram
+    decks {
+        INT id PK "IDENTITY"
+        NVARCHAR(200) name "NOT NULL"
+        NVARCHAR(1000) description "NOT NULL DEFAULT ''"
+        DATETIME2 created_at "NOT NULL DEFAULT SYSUTCDATETIME()"
+    }
+
+    cards {
+        INT id PK "IDENTITY"
+        INT deck_id FK "NOT NULL, ON DELETE CASCADE, index idx_cards_deck"
+        NVARCHAR(MAX) front "NOT NULL"
+        NVARCHAR(MAX) back "NOT NULL"
+        DATETIME2 created_at "NOT NULL DEFAULT SYSUTCDATETIME()"
+    }
+
+    health_probe {
+        INT id PK "one row, id 1"
+        DATETIME2 checked_at "NOT NULL, written by /health"
+    }
+
+    schema_migrations {
+        NVARCHAR(100) version PK "file name without .sql, e.g. 001_init"
+        DATETIME2 applied_at "NOT NULL DEFAULT SYSUTCDATETIME()"
+    }
+
+    decks ||--o{ cards : "deck_id → decks.id"
