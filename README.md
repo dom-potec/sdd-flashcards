@@ -146,6 +146,17 @@ Each service has numbered SQL files in its `migrations/` folder. At startup `app
 
 `services/scheduling/migrations/002_add_lapses.sql` changed a table that already held data on Azure: it adds `lapses` to `card_schedule` and fills it from the existing `reviews`. The evidence is in [`docs/evidence/migration.md`](docs/evidence/migration.md): the deployment run, the startup log line `applied migration 002_add_lapses`, and the live data before and after, with all five rows kept and the two cards that had been answered wrong showing `lapses` 1.
 
+## Partial failure
+
+The two services fail separately. Scheduling calls content in one place only, to get a deck's cards for the study page and the due count, with a 2 second timeout.
+
+| Down | Still works | What the user gets |
+|---|---|---|
+| content | saving a review (`POST /reviews`), reading a card's schedule, scheduling's `/health` | `GET /study/{deck_id}/next` and `/due-count` answer `503 {"error":"content service unavailable"}` within the timeout. The Study page says "Study is unavailable right now (content service unavailable)." Decks cannot be listed, because that is content's own job. |
+| scheduling | listing, creating and deleting decks and cards | The Decks page lists the decks with "—" in the due column and says "Scheduling is unavailable: due counts cannot be shown right now." The Study page says "Study is unavailable right now". |
+
+Neither `/health` calls the other service. The recorded responses, with timings, are in [`docs/evidence/partial-failure.md`](docs/evidence/partial-failure.md).
+
 ## Pipeline
 
 One GitHub Actions workflow, [`.github/workflows/pipeline.yml`](.github/workflows/pipeline.yml), runs on every push to any branch and on every pull request to `main`. A job that fails makes the run red, and a red pull request is not merged.

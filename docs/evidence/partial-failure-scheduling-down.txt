@@ -1,0 +1,57 @@
+$ date -u
+2026-11-21T13:19:09Z
+
+$ docker compose stop scheduling
+ Container pf-evidence-scheduling-1  Stopped
+
+$ curl -i http://localhost:18000/health
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Sat, 21 Nov 2026 13:19:10 GMT
+Connection: keep-alive
+Content-Type: application/json
+Content-Length: 44
+Access-Control-Allow-Origin: http://localhost:18080
+
+{"db":"ok","status":"ok","version":"local"}
+
+[200 in 0.014839 s]
+
+$ curl -i http://localhost:18000/decks
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Sat, 21 Nov 2026 13:19:10 GMT
+Connection: keep-alive
+Content-Type: application/json
+Content-Length: 97
+Access-Control-Allow-Origin: http://localhost:18080
+
+[{"card_count":2,"created_at":"2026-11-21T13:18:34Z","description":"","id":1,"name":"Capitals"}]
+
+[200 in 0.028900 s]
+
+$ curl -i http://localhost:18000/decks/1/cards
+HTTP/1.1 200 OK
+Server: gunicorn
+Date: Sat, 21 Nov 2026 13:19:10 GMT
+Connection: keep-alive
+Content-Type: application/json
+Content-Length: 180
+Access-Control-Allow-Origin: http://localhost:18080
+
+[{"back":"Paris","created_at":"2026-11-21T13:18:34Z","deck_id":1,"front":"France","id":1},{"back":"Madrid","created_at":"2026-11-21T13:18:34Z","deck_id":1,"front":"Spain","id":2}]
+
+[200 in 0.010537 s]
+
+$ curl -i -X POST http://localhost:18000/decks/1/cards -d '{"front":"Italy","back":"Rome"}'
+HTTP/1.1 201 CREATED
+Server: gunicorn
+Date: Sat, 21 Nov 2026 13:19:10 GMT
+Connection: keep-alive
+Content-Type: application/json
+Content-Length: 87
+Access-Control-Allow-Origin: http://localhost:18080
+
+{"back":"Rome","created_at":"2026-11-21T13:19:10Z","deck_id":1,"front":"Italy","id":3}
+
+[201 in 0.016054 s]
