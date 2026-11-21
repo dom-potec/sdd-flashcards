@@ -1,0 +1,30 @@
+erDiagram
+    card_schedule {
+        INT card_id PK "plain id of a card in the content service, no foreign key"
+        FLOAT ease_factor "NOT NULL DEFAULT 2.5"
+        INT repetitions "NOT NULL DEFAULT 0"
+        INT interval_days "NOT NULL DEFAULT 0"
+        DATE due_at "NOT NULL, index idx_schedule_due"
+        INT lapses "NOT NULL DEFAULT 0, added by 002_add_lapses"
+    }
+
+    reviews {
+        INT id PK "IDENTITY"
+        INT card_id "NOT NULL, plain id, index idx_reviews_card"
+        DATETIME2 reviewed_at "NOT NULL DEFAULT SYSUTCDATETIME()"
+        INT grade "NOT NULL, CHECK 0 to 5"
+        INT interval_before "NOT NULL"
+        INT interval_after "NOT NULL"
+    }
+
+    health_probe {
+        INT id PK "one row, id 1"
+        DATETIME2 checked_at "NOT NULL, written by /health"
+    }
+
+    schema_migrations {
+        NVARCHAR(100) version PK "file name without .sql, e.g. 002_add_lapses"
+        DATETIME2 applied_at "NOT NULL DEFAULT SYSUTCDATETIME()"
+    }
+
+    card_schedule ||..o{ reviews : "same card_id (not enforced by the database)"

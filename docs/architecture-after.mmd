@@ -1,0 +1,31 @@
+%%{init: {"flowchart": {"rankSpacing": 55, "nodeSpacing": 45}}}%%
+flowchart TB
+    browser["Browser"]
+
+    ui["Static UI · storage account dpotecieu2024ui<br/>index.html · deck.html · study.html · app.js · config.js"]
+
+    subgraph env["Container Apps environment dpotec-ieu2024-env · each app 0 to 1 replicas"]
+        direction LR
+        content["content · dpotec-ieu2024-content<br/>Flask + gunicorn, port 8000<br/>decks and cards<br/>/health"]
+        scheduling["scheduling · dpotec-ieu2024-scheduling<br/>Flask + gunicorn, port 8000<br/>SM-2 state, reviews, what is due<br/>/health"]
+    end
+
+    subgraph sql["SQL server dpotec-ieu2024-sql · serverless, pauses when idle"]
+        direction LR
+        cdb[("dpotec-ieu2024-content-db<br/>decks · cards<br/>user: content_user")]
+        sdb[("dpotec-ieu2024-scheduling-db<br/>card_schedule · reviews<br/>user: scheduling_user")]
+    end
+
+    browser -- "1 · loads the pages" --> ui
+    browser -- "2 · decks and cards (JSON, CORS)" --> content
+    browser -- "3 · study, reviews, due counts (JSON, CORS)" --> scheduling
+    scheduling == "GET /decks/{deck_id}/cards<br/>2 s timeout · on failure: 503 to the user" ==> content
+    content --> cdb
+    scheduling --> sdb
+
+    classDef contentStyle fill:#dbeafe,stroke:#1d4ed8,color:#111
+    classDef schedStyle fill:#dcfce7,stroke:#15803d,color:#111
+    classDef uiStyle fill:#fef9c3,stroke:#a16207,color:#111
+    class content,cdb contentStyle
+    class scheduling,sdb schedStyle
+    class ui uiStyle

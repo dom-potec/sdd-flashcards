@@ -1,0 +1,40 @@
+%%{init: {"flowchart": {"rankSpacing": 50, "nodeSpacing": 40}}}%%
+flowchart LR
+    dev["git push / pull request"]
+
+    subgraph gh["GitHub · dom-potec/sdd-flashcards"]
+        direction TB
+        subgraph ci["pipeline.yml · every push and pull request"]
+            direction TB
+            test["test (content, scheduling)<br/>flake8 · pytest · coverage ≥ 70%"]
+            docs["validate-docs<br/>openapi.yaml ×2 · system.yaml"]
+            images["images (content, scheduling)<br/>docker build · push on main"]
+            integ["integration<br/>compose stack · cross-service tests"]
+        end
+        deploy["deploy · main only, after all four<br/>signs in with OIDC, no stored password"]
+        secrets[/"secrets: AZURE_CLIENT_ID, AZURE_TENANT_ID,<br/>AZURE_SUBSCRIPTION_ID, CONTENT_DB_PASSWORD,<br/>SCHEDULING_DB_PASSWORD, CI_SA_PASSWORD"/]
+        ghcr[("GHCR<br/>sdd-flashcards-content:&lt;sha&gt;<br/>sdd-flashcards-scheduling:&lt;sha&gt;")]
+    end
+
+    subgraph az["Azure · resource group rg-dpotec-ieu2024 · swedencentral"]
+        direction TB
+        identity["managed identity<br/>dpotec-ieu2024-github<br/>Contributor on this group"]
+        ca1["Container App<br/>dpotec-ieu2024-content"]
+        ca2["Container App<br/>dpotec-ieu2024-scheduling"]
+        sqlsrv[("SQL server dpotec-ieu2024-sql<br/>content-db · scheduling-db")]
+        web["storage account dpotecieu2024ui<br/>static website: the UI"]
+    end
+
+    dev --> ci
+    ci --> deploy
+    images -- "push" --> ghcr
+    secrets -.-> deploy
+    deploy -- "OIDC token for main" --> identity
+    deploy -- "set image &lt;sha&gt; and database-url secret" --> ca1
+    deploy -- "set image &lt;sha&gt; and database-url secret" --> ca2
+    deploy -- "upload ui/ with config.js" --> web
+    deploy -. "wait: /health reports &lt;sha&gt;" .-> ca1
+    ghcr -- "pull" --> ca1
+    ghcr -- "pull" --> ca2
+    ca1 --> sqlsrv
+    ca2 --> sqlsrv
